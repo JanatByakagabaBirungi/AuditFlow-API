@@ -1,16 +1,33 @@
-# AuditFlow REST API
+# AuditFlow API
 
-A lightweight, reliable event ingestion and audit log REST service engineered in Python using Flask. Designed to demonstrate clean API architecture, request tracing, strict input sanitization, and query pagination.
+A production-ready event ingestion and audit log microservice built with Python and Flask. 
+
+AuditFlow moves beyond a basic CRUD application by implementing an enterprise-style architecture. It uses MongoDB for persistent document storage, enforces API key authentication for security, and is fully containerized with Docker for seamless deployment. 
 
 ## 🚀 Key Features
 
-- **Strict Schema Validation**: Validates JSON payloads on ingestion, rejecting malformed data with structured, actionable 4xx HTTP responses.
-- **Filtering & Pagination**: Efficiently slice and filter large datasets via query parameters (`?severity=critical&limit=10&offset=0`).
-- **Telemetry & Request Tracing**: Injects unique `X-Request-ID` and `X-Response-Time-MS` response headers for full request lifecycle visibility.
-- **Operational Health Probing**: Exposes a `/healthz` endpoint for integration into container orchestration (Docker/Kubernetes).
-- **Consistent Envelope Pattern**: Standardized response structures across all successes and failure states.
+* **Persistent Document Storage:** Integrates MongoDB to handle flexible, schema-less event payloads, demonstrating scalable data modeling.
+* **Containerized Architecture:** Utilizes Docker and Docker Compose to orchestrate the Flask API and MongoDB database within an isolated network.
+* **Secure Endpoints:** Implements a custom Python decorator to enforce strict `X-API-Key` header authentication on all data-mutating and retrieval endpoints.
+* **Analytics Export:** Features an `/export` endpoint that streams raw database records directly to CSV, perfectly formatted for immediate ingestion and data verification in tools like Microsoft Excel or Power BI.
+* **Telemetry & Observability:** Automatically injects `X-Request-ID` and `X-Response-Time-MS` headers into every response to track the full request lifecycle.
 
----
+## 🛠️ Tech Stack
+
+* **Backend:** Python 3.11, Flask
+* **Database:** MongoDB 6.0, PyMongo
+* **Infrastructure:** Docker, Docker Compose
+* **Data Format:** JSON, CSV
+
+### Prerequisites
+* Docker and Docker Compose installed on your machine.
+
+### Installation & Run
+
+1. **Clone the repository:**
+   ```bash
+   git clone [https://github.com/yourusername/auditflow-api.git](https://github.com/yourusername/auditflow-api.git)
+   cd auditflow-api
 
 ## 🛠️ API Reference
 
@@ -23,3 +40,4 @@ A lightweight, reliable event ingestion and audit log REST service engineered in
   "status": "healthy",
   "timestamp": "2026-09-03T20:54:51.000Z"
 }
+
