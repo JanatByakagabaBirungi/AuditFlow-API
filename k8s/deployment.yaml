@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auditflow-api
+  labels:
+    app: auditflow-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auditflow-api
+  template:
+    metadata:
+      labels:
+        app: auditflow-api
+    spec:
+      containers:
+      - name: api
+        image: your-dockerhub-username/auditflow-api:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: MONGO_URI
+          value: "mongodb://mongo:27017/"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: auditflow-secrets
+              key: api-key
