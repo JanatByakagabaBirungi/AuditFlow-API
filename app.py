@@ -7,20 +7,56 @@ from datetime import datetime, timezone
 from flask import Flask, jsonify, request, Response
 from pymongo import MongoClient
 from functools import wraps
+from flasgger import Swagger
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 
 app = Flask(__name__)
 
-# Database Configuration
+# --- Setup Rate Limiting ---
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"],
+    storage_uri="memory://"
+)
+
+# --- Setup Swagger Documentation ---
+swagger_config = {
+    "headers": [],
+    "specs": [{"endpoint": 'apispec_1', "route": '/apispec_1.json', "rule_filter": lambda rule: True, "model_filter": lambda tag: True}],
+    "static_url_path": "/flasgger_static",
+    "swagger_ui": True,
+    "specs_route": "/apidocs/"
+}
+
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "AuditFlow API",
+        "description": "Production-ready event ingestion and audit log service.",
+        "version": "1.0.0"
+    },
+    "securityDefinitions": {
+        "APIKeyHeader": {
+            "type": "apiKey",
+            "name": "X-API-Key",
+            "in": "header"
+        }
+    }
+}
+swagger = Swagger(app, config=swagger_config, template=swagger_template)
+
+# --- Database & Auth Setup ---
 MONGO_URI = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 client = MongoClient(MONGO_URI)
 db = client.auditflow
 events_collection = db.events
 
 VALID_SEVERITIES = {"info", "warning", "critical"}
-API_KEY = os.getenv("API_KEY", "dev-secret-key-123")
+API_KEY = os.getenv("API_KEY", "portfolio-secret-key-2026")
 
 def require_api_key(f):
-    """Decorator to enforce API key authentication."""
     @wraps(f)
     def decorated(*args, **kwargs):
         key = request.headers.get("X-API-Key")
@@ -42,8 +78,15 @@ def inject_metadata(response):
     return response
 
 @app.route("/healthz", methods=["GET"])
+@limiter.exempt
 def health_check():
-    """System health check including database connectivity."""
+    """
+    System health check
+    ---
+    responses:
+      200:
+        description: Returns system and database health status
+    """
     db_status = "connected"
     try:
         client.admin.command('ping')
@@ -59,8 +102,39 @@ def health_check():
 
 @app.route("/api/v1/events", methods=["POST"])
 @require_api_key
+@limiter.limit("10 per minute")
 def create_event():
-    """Ingests and validates an audit event."""
+    """
+    Ingest a new audit event
+    ---
+    security:
+      - APIKeyHeader: []
+    parameters:
+      - in: body
+        name: body
+        required: true
+        schema:
+          type: object
+          properties:
+            source:
+              type: string
+              example: auth-service
+            action:
+              type: string
+              example: user.login.failed
+            severity:
+              type: string
+              example: warning
+            metadata:
+              type: object
+    responses:
+      201:
+        description: Event created successfully
+      400:
+        description: Bad request / Missing fields
+      401:
+        description: Unauthorized
+    """
     payload = request.get_json() or {}
     
     required_fields = ["source", "action", "severity"]
@@ -81,15 +155,36 @@ def create_event():
     }
 
     events_collection.insert_one(new_event.copy())
-    
-    # Remove MongoDB's internal _id before returning to client
     new_event.pop("_id", None)
     return jsonify({"success": True, "data": new_event}), 201
 
 @app.route("/api/v1/events", methods=["GET"])
 @require_api_key
 def list_events():
-    """Fetches events with MongoDB query filtering and pagination."""
+    """
+    List events with filtering and pagination
+    ---
+    security:
+      - APIKeyHeader: []
+    parameters:
+      - in: query
+        name: severity
+        type: string
+        required: false
+      - in: query
+        name: limit
+        type: integer
+        default: 10
+      - in: query
+        name: offset
+        type: integer
+        default: 0
+    responses:
+      200:
+        description: A list of events
+      401:
+        description: Unauthorized
+    """
     query = {}
     if request.args.get("severity"):
         query["severity"] = request.args.get("severity").lower()
@@ -111,10 +206,20 @@ def list_events():
 
 @app.route("/api/v1/events/export", methods=["GET"])
 @require_api_key
+@limiter.limit("2 per minute")
 def export_events_csv():
-    """Exports all audit events as a CSV stream for data analysis tools."""
+    """
+    Export all events to CSV
+    ---
+    security:
+      - APIKeyHeader: []
+    responses:
+      200:
+        description: CSV file download
+      401:
+        description: Unauthorized
+    """
     cursor = events_collection.find({}, {"_id": 0}).sort("created_at", -1)
-    
     output = io.StringIO()
     writer = csv.writer(output)
     writer.writerow(["Event ID", "Timestamp", "Source", "Action", "Severity", "Metadata"])
