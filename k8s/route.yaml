@@ -1,0 +1,12 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: auditflow-route
+spec:
+  to:
+    kind: Service
+    name: auditflow-service
+  port:
+    targetPort: 80
+  tls:
+    termination: edge
