@@ -1,0 +1,29 @@
+version: '3.8'
+
+services:
+  api:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - MONGO_URI=mongodb://database:27017/
+      - API_KEY=portfolio-secret-key-2026
+    depends_on:
+      - database
+    networks:
+      - audit-network
+
+  database:
+    image: mongo:6.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - audit-network
+
+networks:
+  audit-network:
+
+volumes:
+  mongo_data:
